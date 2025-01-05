@@ -3,7 +3,7 @@ Option Explicit
 
 Public Sub sgSpillCleanup()
     'sgSpillCleanup (C)Copyright Stephen Goldsmith 2024-2025. All rights reserved.
-    'Version 1.0.0 last updated January 2025
+    'Version 1.0.1 last updated January 2025
     'Distributed at https://github.com/goldsafety/ and https://aircraftsystemsafety.com/code/
     
     'Excel VBA script to cleanup spilling from dynamic arrays by resolving #SPILL! errors and removing blank rows.
@@ -29,7 +29,7 @@ Public Sub sgSpillCleanup()
     'that the number of rows returned is changing. If a #SPILL! error is being caused by data to the right of
     'a spill range rather than below it, unexpected results may occur.
     
-    Dim i As Integer, l As Long, s As String, rCell As Range, lRowsInserted As Long, lRowsDeleted As Long
+    Dim i As Integer, l As Long, s As String, lSpillRows As Long, rCell As Range, lRowsInserted As Long, lRowsDeleted As Long
     
     i = MsgBox("This procedure will insert or delete entire rows to resolve #SPILL! errors and to ensure only one blank row exists after a spill range. Unexpected results can occur if you have data either side of a spill range, including the deletion of that data. Make sure you save a copy before running this procedure as this cannot be undone. Are you sure you want to proceed?", vbYesNo Or vbQuestion Or vbDefaultButton2, "Spill Cleanup")
     If i <> vbYes Then
@@ -66,27 +66,32 @@ Public Sub sgSpillCleanup()
         End If
     Next
     
-    'Make sure there is one blank row after every spill range
+    'Make sure there is one blank row after every spilling range, or FILTER or SORT dynamic array that is not spilling (either only one match or no matches)
     For Each rCell In ActiveSheet.UsedRange
+        lSpillRows = 0 'This variable holds how many rows are being spilled or zero if this is not a spilling range
         If rCell.HasSpill = True Then
             If rCell.Address = rCell.SpillParent.Address Then
-                l = rCell.Row + rCell.SpillingToRange.Rows.Count
-                If Application.WorksheetFunction.CountA(ActiveSheet.Rows(l)) <> 0 Then
-                    'Insert a blank row
-                    ActiveSheet.Rows(l).Insert xlShiftDown, xlFormatFromLeftOrAbove
-                    lRowsInserted = lRowsInserted + 1
-                ElseIf l < ActiveSheet.UsedRange.Row + ActiveSheet.UsedRange.Rows.Count Then
-                    'Delete extra blank rows
-                    Do While Application.WorksheetFunction.CountA(ActiveSheet.Rows(l + 1)) = 0
-                        ActiveSheet.Rows(l).Delete
-                        lRowsDeleted = lRowsDeleted + 1
-                        If lRowsDeleted Mod 1000 = 0 Then
-                            i = MsgBox("A large number of rows (" & lRowsDeleted & ") have been deleted, which might indicate a problem. Do you wish to continue?", vbYesNo Or vbQuestion Or vbDefaultButton2, "Spill Cleanup")
-                            If i <> vbYes Then
-                                Exit Sub
-                            End If
-                        End If
-                    Loop
+                lSpillRows = rCell.SpillingToRange.Rows.Count
+            End If
+        ElseIf rCell.Formula <> "" Then
+            If Left(rCell.Formula, 8) = "=FILTER(" Or Left(rCell.Formula, 6) = "=SORT(" Then
+                lSpillRows = 1
+            End If
+        End If
+        If lSpillRows > 0 Then
+            l = rCell.Row + lSpillRows
+            If Application.WorksheetFunction.CountA(ActiveSheet.Rows(l)) <> 0 Then
+                'Insert a blank row
+                ActiveSheet.Rows(rCell.Row + 1).Insert xlShiftDown, xlFormatFromLeftOrAbove
+                lRowsInserted = lRowsInserted + 1
+            Else
+                'Delete extra blank rows
+                Do
+                    l = l + 1
+                Loop Until l > ActiveSheet.UsedRange.Row + ActiveSheet.UsedRange.Rows.Count Or Application.WorksheetFunction.CountA(ActiveSheet.Rows(l)) <> 0
+                If (l - rCell.Row - lSpillRows - 1) > 0 Then
+                    ActiveSheet.Range((rCell.Row + 1) & ":" & (l - lSpillRows - 1)).Delete
+                    lRowsDeleted = lRowsDeleted + (l - rCell.Row - lSpillRows - 1)
                 End If
             End If
         End If
