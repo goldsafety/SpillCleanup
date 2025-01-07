@@ -1,15 +1,15 @@
-Attribute VB_Name = "SpillCleanup"
+Attribute VB_Name = "sgSpillCleanup"
 Option Explicit
 
-Public Sub sgSpillCleanup()
-    'sgSpillCleanup (C)Copyright Stephen Goldsmith 2024-2025. All rights reserved.
-    'Version 1.0.1 last updated January 2025
+Public Sub SpillCleanup()
+    'SpillCleanup (C)Copyright Stephen Goldsmith 2024-2025. All rights reserved.
+    'Version 1.0.2 last updated January 2025
     'Distributed at https://github.com/goldsafety/ and https://aircraftsystemsafety.com/code/
     
     'Excel VBA script to cleanup spilling from dynamic arrays by resolving #SPILL! errors and removing blank rows.
     
     'Eclipse Public License - v 2.0
-    'THE ACCOMPANYING PROGRAM IS PROVIDED UNDER THE TERMS OF THIS ECLIPSE PUBLIC LICENSE (‚ÄúAGREEMENT‚Äù).
+    'THE ACCOMPANYING PROGRAM IS PROVIDED UNDER THE TERMS OF THIS ECLIPSE PUBLIC LICENSE (ìAGREEMENTî).
     'ANY USE, REPRODUCTION OR DISTRIBUTION OF THE PROGRAM CONSTITUTES RECIPIENT'S ACCEPTANCE OF THIS AGREEMENT.
     'https://www.eclipse.org/legal/epl-2.0/
     
@@ -29,7 +29,7 @@ Public Sub sgSpillCleanup()
     'that the number of rows returned is changing. If a #SPILL! error is being caused by data to the right of
     'a spill range rather than below it, unexpected results may occur.
     
-    Dim i As Integer, l As Long, s As String, lSpillRows As Long, rCell As Range, lRowsInserted As Long, lRowsDeleted As Long
+    Dim i As Integer, l As Long, s As String, lSpillRows As Long, rCell As Range, lBlocksInserted As Long, lBlocksDeleted As Long
     
     i = MsgBox("This procedure will insert or delete entire rows to resolve #SPILL! errors and to ensure only one blank row exists after a spill range. Unexpected results can occur if you have data either side of a spill range, including the deletion of that data. Make sure you save a copy before running this procedure as this cannot be undone. Are you sure you want to proceed?", vbYesNo Or vbQuestion Or vbDefaultButton2, "Spill Cleanup")
     If i <> vbYes Then
@@ -49,14 +49,20 @@ Public Sub sgSpillCleanup()
             If rCell.Value = CVErr(2045) Then 'Error 2045 is #SPILL!
                 s = rCell.Offset(0, 1).Address & ":" & ActiveSheet.Cells(rCell.Row + 1, ActiveSheet.UsedRange.Column + ActiveSheet.UsedRange.Columns.Count - 1).Address
                 If Application.WorksheetFunction.CountA(ActiveSheet.Range(s)) > 0 Then
-                    MsgBox "Cannot complete spill cleanup. There is data to the right of a spill range (" & s & "). A total of " & lRowsInserted & " row(s) have already been inserted and " & lRowsDeleted & " row(s) deleted.", vbCritical, "Spill Cleanup"
+                    MsgBox "Cannot complete spill cleanup. There is data to the right of a spill range (" & s & "). A total of " & lBlocksInserted & " row(s) have already been inserted and " & lBlocksDeleted & " row(s) deleted.", vbCritical, "Spill Cleanup"
                     Exit Sub
                 End If
                 Do
+                    'Inserting one row at a time takes a long time to recalculate (we can't set calculation to manual as we need to know if
+                    'the spill error has been resolved). As such, insert in blocks of 100 (we will delete the extra rows later) but first
+                    'make a copy of the first row (clearing contents) to ensure we copy the formatting (such as gridlines).
                     ActiveSheet.Rows(rCell.Row + 1).Insert xlShiftDown, xlFormatFromLeftOrAbove
-                    lRowsInserted = lRowsInserted + 1
-                    If lRowsInserted Mod 1000 = 0 Then
-                        i = MsgBox("A large number of rows (" & lRowsInserted & ") have been inserted, which might indicate a problem. Do you wish to continue?", vbYesNo Or vbQuestion Or vbDefaultButton2, "Spill Cleanup")
+                    ActiveSheet.Rows(rCell.Row).Copy ActiveSheet.Rows(rCell.Row + 1)
+                    ActiveSheet.Rows(rCell.Row + 1).ClearContents
+                    ActiveSheet.Rows(rCell.Row + 1 & ":" & rCell.Row + 100).Insert xlShiftDown, xlFormatFromLeftOrAbove
+                    lBlocksInserted = lBlocksInserted + 1
+                    If lBlocksInserted Mod 100 = 0 Then
+                        i = MsgBox("A large number of rows (in " & lBlocksInserted & " blocks) have been inserted, which might indicate a problem. Do you wish to continue?", vbYesNo Or vbQuestion Or vbDefaultButton2, "Spill Cleanup")
                         If i <> vbYes Then
                             Exit Sub
                         End If
@@ -83,19 +89,19 @@ Public Sub sgSpillCleanup()
             If Application.WorksheetFunction.CountA(ActiveSheet.Rows(l)) <> 0 Then
                 'Insert a blank row
                 ActiveSheet.Rows(rCell.Row + 1).Insert xlShiftDown, xlFormatFromLeftOrAbove
-                lRowsInserted = lRowsInserted + 1
+                lBlocksInserted = lBlocksInserted + 1
             Else
                 'Delete extra blank rows
                 Do
                     l = l + 1
                 Loop Until l > ActiveSheet.UsedRange.Row + ActiveSheet.UsedRange.Rows.Count Or Application.WorksheetFunction.CountA(ActiveSheet.Rows(l)) <> 0
                 If (l - rCell.Row - lSpillRows - 1) > 0 Then
-                    ActiveSheet.Range((rCell.Row + 1) & ":" & (l - lSpillRows - 1)).Delete
-                    lRowsDeleted = lRowsDeleted + (l - rCell.Row - lSpillRows - 1)
+                    ActiveSheet.Rows((rCell.Row + 1) & ":" & (l - lSpillRows - 1)).Delete
+                    lBlocksDeleted = lBlocksDeleted + 1
                 End If
             End If
         End If
     Next
     
-    MsgBox "Cleanup completed. A total of " & lRowsInserted & " row(s) were inserted and " & lRowsDeleted & " row(s) were deleted.", vbInformation, "Spill Cleanup"
+    MsgBox "Cleanup completed. A total of " & lBlocksInserted & " block(s) of rows were inserted and " & lBlocksDeleted & " block(s) of rows were deleted.", vbInformation, "Spill Cleanup"
 End Sub
