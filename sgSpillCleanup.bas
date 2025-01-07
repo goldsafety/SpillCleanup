@@ -9,7 +9,7 @@ Public Sub sgSpillCleanup()
     'Excel VBA script to cleanup spilling from dynamic arrays by resolving #SPILL! errors and removing blank rows.
     
     'Eclipse Public License - v 2.0
-    'THE ACCOMPANYING PROGRAM IS PROVIDED UNDER THE TERMS OF THIS ECLIPSE PUBLIC LICENSE (ìAGREEMENTî).
+    'THE ACCOMPANYING PROGRAM IS PROVIDED UNDER THE TERMS OF THIS ECLIPSE PUBLIC LICENSE (‚ÄúAGREEMENT‚Äù).
     'ANY USE, REPRODUCTION OR DISTRIBUTION OF THE PROGRAM CONSTITUTES RECIPIENT'S ACCEPTANCE OF THIS AGREEMENT.
     'https://www.eclipse.org/legal/epl-2.0/
     
