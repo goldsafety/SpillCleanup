@@ -3,7 +3,7 @@ Option Explicit
 
 Public Sub SpillCleanup()
     'SpillCleanup (C)Copyright Stephen Goldsmith 2024-2025. All rights reserved.
-    'Version 1.0.3 last updated January 2025
+    'Version 1.0.4 last updated January 2025
     'Distributed at https://github.com/goldsafety/ and https://aircraftsystemsafety.com/code/
     
     'Excel VBA script to cleanup spilling from dynamic arrays by resolving #SPILL! errors and removing blank rows.
@@ -29,6 +29,13 @@ Public Sub SpillCleanup()
     'that the number of rows returned is changing. If a #SPILL! error is being caused by data to the right of
     'a spill range rather than below it, unexpected results may occur.
     
+    'History
+    '1.0.0  First public release
+    '1.0.1  Delete rows in one block rather than line by line
+    '1.0.2  Insert large blocks of 100 rows rather than line by line until the spill error is resolved
+    '1.0.3  Added progress message to statusbar and toggle wrap text
+    '1.0.4  Changed wrap text to first column only instead of entire row
+    
     Dim i As Integer, l As Long, s As String, lSpillRows As Long, rCell As Range, lBlocksInserted As Long, lBlocksDeleted As Long
     Dim bStatusBarState As Boolean, lSpillRanges As Long, lSpillRange As Long
     
@@ -39,6 +46,7 @@ Public Sub SpillCleanup()
     
     bStatusBarState = Application.DisplayStatusBar
     Application.DisplayStatusBar = True
+    Application.StatusBar = "Spill Cleanup: 0% complete"
     
     'There are a couple of methods to find the overall data range in the current worksheet, see:
     'https://learn.microsoft.com/en-us/office/vba/excel/concepts/cells-and-ranges/select-a-range
@@ -84,7 +92,7 @@ Public Sub SpillCleanup()
                     End If
                 Loop Until IsError(rCell.Value) = False
                 lSpillRange = lSpillRange + 1
-                Application.StatusBar = "SpillCleanup: " & Int((lSpillRange / lSpillRanges) * 50) & "% complete"
+                Application.StatusBar = "Spill Cleanup: " & Int((lSpillRange / lSpillRanges) * 50) & "% complete"
                 DoEvents
             End If
         End If
@@ -142,8 +150,8 @@ Public Sub SpillCleanup()
             'we only seem to need to toggle the first column and the other columns will update also.
             If rCell.WrapText = True Then
                 If rCell.HasSpill = True Then
-                    ActiveSheet.Rows(rCell.Row & ":" & rCell.Row + rCell.SpillingToRange.Rows.Count - 1).WrapText = False
-                    ActiveSheet.Rows(rCell.Row & ":" & rCell.Row + rCell.SpillingToRange.Rows.Count - 1).WrapText = True
+                    ActiveSheet.Range(rCell.Address & ":" & rCell.Offset(rCell.SpillingToRange.Rows.Count - 1).Address).WrapText = False
+                    ActiveSheet.Range(rCell.Address & ":" & rCell.Offset(rCell.SpillingToRange.Rows.Count - 1).Address).WrapText = True
                 Else
                     rCell.WrapText = False
                     rCell.WrapText = True
@@ -152,7 +160,7 @@ Public Sub SpillCleanup()
             
             'Update status bar
             lSpillRange = lSpillRange + 1
-            Application.StatusBar = "SpillCleanup: " & Int(50 + (lSpillRange / lSpillRanges) * 50) & "% complete"
+            Application.StatusBar = "Spill Cleanup: " & Int(50 + (lSpillRange / lSpillRanges) * 50) & "% complete"
             DoEvents
         End If
     Next
