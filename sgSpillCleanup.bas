@@ -3,7 +3,7 @@ Option Explicit
 
 Public Sub SpillCleanup()
     'SpillCleanup (C)Copyright Stephen Goldsmith 2024-2025. All rights reserved.
-    'Version 1.0.2 last updated January 2025
+    'Version 1.0.3 last updated January 2025
     'Distributed at https://github.com/goldsafety/ and https://aircraftsystemsafety.com/code/
     
     'Excel VBA script to cleanup spilling from dynamic arrays by resolving #SPILL! errors and removing blank rows.
@@ -30,11 +30,15 @@ Public Sub SpillCleanup()
     'a spill range rather than below it, unexpected results may occur.
     
     Dim i As Integer, l As Long, s As String, lSpillRows As Long, rCell As Range, lBlocksInserted As Long, lBlocksDeleted As Long
+    Dim bStatusBarState As Boolean, lSpillRanges As Long, lSpillRange As Long
     
-    i = MsgBox("This procedure will insert or delete entire rows to resolve #SPILL! errors and to ensure only one blank row exists after a spill range. Unexpected results can occur if you have data either side of a spill range, including the deletion of that data. Make sure you save a copy before running this procedure as this cannot be undone. Are you sure you want to proceed?", vbYesNo Or vbQuestion Or vbDefaultButton2, "Spill Cleanup")
+    i = MsgBox("This procedure will insert or delete entire rows to resolve #SPILL! errors and to ensure only one blank row exists after a spill range. Unexpected results can occur if you have data either side of a spill range, including the deletion of that data. Make sure you save a copy before running this procedure as this cannot be undone. If you have a large number of dynamic arrays, this procedure can take several minutes. Are you sure you want to proceed?", vbYesNo Or vbQuestion Or vbDefaultButton2, "Spill Cleanup")
     If i <> vbYes Then
         Exit Sub
     End If
+    
+    bStatusBarState = Application.DisplayStatusBar
+    Application.DisplayStatusBar = True
     
     'There are a couple of methods to find the overall data range in the current worksheet, see:
     'https://learn.microsoft.com/en-us/office/vba/excel/concepts/cells-and-ranges/select-a-range
@@ -43,7 +47,18 @@ Public Sub SpillCleanup()
     'lLastRow = ActiveSheet.Cells.Find("*", SearchOrder:=xlByRows, SearchDirection:=xlPrevious).Row
     'lLastCol = ActiveSheet.Cells.Find("*", SearchOrder:=xlByColumns, SearchDirection:=xlPrevious).Column
     
+    'Find out how many spill ranges there are
+    lSpillRanges = 0
+    For Each rCell In ActiveSheet.UsedRange
+        If IsError(rCell.Value) Then
+            If rCell.Value = CVErr(2045) Then 'Error 2045 is #SPILL!
+                lSpillRanges = lSpillRanges + 1
+            End If
+        End If
+    Next
+    
     'Insert rows to resolve any spill errors
+    lSpillRange = 0
     For Each rCell In ActiveSheet.UsedRange
         If IsError(rCell.Value) Then
             If rCell.Value = CVErr(2045) Then 'Error 2045 is #SPILL!
@@ -68,11 +83,33 @@ Public Sub SpillCleanup()
                         End If
                     End If
                 Loop Until IsError(rCell.Value) = False
+                lSpillRange = lSpillRange + 1
+                Application.StatusBar = "SpillCleanup: " & Int((lSpillRange / lSpillRanges) * 50) & "% complete"
+                DoEvents
             End If
         End If
     Next
     
+    'Find out how many spill ranges there are
+    lSpillRanges = 0
+    For Each rCell In ActiveSheet.UsedRange
+        lSpillRows = 0 'This variable holds how many rows are being spilled or zero if this is not a spilling range
+        If rCell.HasSpill = True Then
+            If rCell.Address = rCell.SpillParent.Address Then
+                lSpillRows = rCell.SpillingToRange.Rows.Count
+            End If
+        ElseIf rCell.Formula <> "" Then
+            If Left(rCell.Formula, 8) = "=FILTER(" Or Left(rCell.Formula, 6) = "=SORT(" Then
+                lSpillRows = 1
+            End If
+        End If
+        If lSpillRows > 0 Then
+            lSpillRanges = lSpillRanges + 1
+        End If
+    Next
+    
     'Make sure there is one blank row after every spilling range, or FILTER or SORT dynamic array that is not spilling (either only one match or no matches)
+    lSpillRange = 0
     For Each rCell In ActiveSheet.UsedRange
         lSpillRows = 0 'This variable holds how many rows are being spilled or zero if this is not a spilling range
         If rCell.HasSpill = True Then
@@ -100,8 +137,28 @@ Public Sub SpillCleanup()
                     lBlocksDeleted = lBlocksDeleted + 1
                 End If
             End If
+            
+            'Excel does not seem to update the word wrapping for the dynamic arrays so we must toggle it manually, however
+            'we only seem to need to toggle the first column and the other columns will update also.
+            If rCell.WrapText = True Then
+                If rCell.HasSpill = True Then
+                    ActiveSheet.Rows(rCell.Row & ":" & rCell.Row + rCell.SpillingToRange.Rows.Count - 1).WrapText = False
+                    ActiveSheet.Rows(rCell.Row & ":" & rCell.Row + rCell.SpillingToRange.Rows.Count - 1).WrapText = True
+                Else
+                    rCell.WrapText = False
+                    rCell.WrapText = True
+                End If
+            End If
+            
+            'Update status bar
+            lSpillRange = lSpillRange + 1
+            Application.StatusBar = "SpillCleanup: " & Int(50 + (lSpillRange / lSpillRanges) * 50) & "% complete"
+            DoEvents
         End If
     Next
+    
+    Application.StatusBar = False
+    Application.DisplayStatusBar = bStatusBarState
     
     MsgBox "Cleanup completed. A total of " & lBlocksInserted & " block(s) of rows were inserted and " & lBlocksDeleted & " block(s) of rows were deleted.", vbInformation, "Spill Cleanup"
 End Sub
