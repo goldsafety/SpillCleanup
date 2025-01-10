@@ -3,7 +3,7 @@ Option Explicit
 
 Public Sub SpillCleanup()
     'SpillCleanup (C)Copyright Stephen Goldsmith 2024-2025. All rights reserved.
-    'Version 1.0.4 last updated January 2025
+    'Version 1.0.5 last updated January 2025
     'Distributed at https://github.com/goldsafety/ and https://aircraftsystemsafety.com/code/
     
     'Excel VBA script to cleanup spilling from dynamic arrays by resolving #SPILL! errors and removing blank rows.
@@ -35,9 +35,11 @@ Public Sub SpillCleanup()
     '1.0.2  Insert large blocks of 100 rows rather than line by line until the spill error is resolved
     '1.0.3  Added progress message to statusbar and toggle wrap text
     '1.0.4  Changed wrap text to first column only instead of entire row
+    '1.0.5  Set calculation mode to manual and only calculate the spill range being updated to improve speed
     
     Dim i As Integer, l As Long, s As String, lSpillRows As Long, rCell As Range, lBlocksInserted As Long, lBlocksDeleted As Long
     Dim bStatusBarState As Boolean, lSpillRanges As Long, lSpillRange As Long
+    Dim lCalcMode As Long
     
     i = MsgBox("This procedure will insert or delete entire rows to resolve #SPILL! errors and to ensure only one blank row exists after a spill range. Unexpected results can occur if you have data either side of a spill range, including the deletion of that data. Make sure you save a copy before running this procedure as this cannot be undone. If you have a large number of dynamic arrays, this procedure can take several minutes. Are you sure you want to proceed?", vbYesNo Or vbQuestion Or vbDefaultButton2, "Spill Cleanup")
     If i <> vbYes Then
@@ -47,6 +49,10 @@ Public Sub SpillCleanup()
     bStatusBarState = Application.DisplayStatusBar
     Application.DisplayStatusBar = True
     Application.StatusBar = "Spill Cleanup: 0% complete"
+    
+    lCalcMode = Application.Calculation
+    Application.Calculation = xlCalculationManual
+    Application.ScreenUpdating = False
     
     'There are a couple of methods to find the overall data range in the current worksheet, see:
     'https://learn.microsoft.com/en-us/office/vba/excel/concepts/cells-and-ranges/select-a-range
@@ -90,6 +96,8 @@ Public Sub SpillCleanup()
                             Exit Sub
                         End If
                     End If
+                    'Update just this spill range before checking if no longer an error
+                    rCell.Calculate
                 Loop Until IsError(rCell.Value) = False
                 lSpillRange = lSpillRange + 1
                 Application.StatusBar = "Spill Cleanup: " & Int((lSpillRange / lSpillRanges) * 50) & "% complete"
@@ -97,6 +105,9 @@ Public Sub SpillCleanup()
             End If
         End If
     Next
+    
+    'Do a full recalculate before moving on to deleting blank rows
+    Application.Calculate
     
     'Find out how many spill ranges there are
     lSpillRanges = 0
@@ -165,6 +176,12 @@ Public Sub SpillCleanup()
         End If
     Next
     
+    'Do a full update and then restore calculation mode
+    Application.Calculate
+    Application.Calculation = lCalcMode
+    Application.ScreenUpdating = True
+    
+    'Reset status bar
     Application.StatusBar = False
     Application.DisplayStatusBar = bStatusBarState
     
