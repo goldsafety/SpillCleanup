@@ -1,4 +1,4 @@
-SpillCleanup (C)Copyright Stephen Goldsmith 2024-2025. All rights reserved.
+# SpillCleanup (C)Copyright Stephen Goldsmith 2024-2025. All rights reserved.
 Distributed at https://github.com/goldsafety/ and https://aircraftsystemsafety.com/code/
 
 Excel VBA script to cleanup spilling from dynamic arrays by resolving #SPILL! errors and removing blank rows.
@@ -46,9 +46,9 @@ gone wrong (at which point a hundred or more rows will already have been inserte
 #SPILL! errors caused by the FILTER or SORT dynamic array functions will be resolved, though it is
 relatively simple to add support for others (please let me know).
 
-#Installation
+## Installation
 
-SpillCleanup is a sub procedure which should be called from either a command button inside your workbook
+SpillCleanup is a SUB procedure which should be called from either a command button inside your workbook
 or from a user command added to the quick access toolbar or to the ribbon. To install, import the
 sgSpillCleanup.bas file into the macro-enabled workbook in which you want to use the procedure, or to a
 macro-enabled workbook which you can then save as an Excel Add-In.
@@ -56,7 +56,7 @@ macro-enabled workbook which you can then save as an Excel Add-In.
 For more information about getting started with VBA in Microsoft Office, please visit
 https://learn.microsoft.com/en-us/office/vba/library-reference/concepts/getting-started-with-vba-in-office
 
-#Acknowledgements
+## Acknowledgements
 
 Microsoft and Excel are registered trademarks of Microsoft Corporation. All third party trademarks belong
 to their respective owners, and the code and the author of this VBA script are in no way affiliated with
